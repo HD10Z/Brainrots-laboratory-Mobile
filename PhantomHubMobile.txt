@@ -975,6 +975,129 @@ local isNoclip = createOption("Noclip", false, "Config", function(active)
     end
 end)
 
+local shiftLockSystemEnabled = false
+local shiftLockActive = false
+local shiftLockGui = nil
+local shiftLockBtn = nil
+local shiftLockConnection = nil
+local TweenService = game:GetService("TweenService")
+
+local function getCharacterForShiftLock()
+    local character = Player.Character or Player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local root = character:WaitForChild("HumanoidRootPart")
+    return character, humanoid, root
+end
+
+local function enableShiftLockSystem()
+    local character, humanoid, root = getCharacterForShiftLock()
+    
+    shiftLockActive = true
+    if shiftLockBtn then
+        shiftLockBtn.Image = "rbxassetid://139211296111194"
+    end
+    
+    workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    
+    humanoid.AutoRotate = false
+    
+    if shiftLockConnection then shiftLockConnection:Disconnect() end
+    
+    shiftLockConnection = RunService.RenderStepped:Connect(function()
+        if shiftLockActive and shiftLockSystemEnabled then
+            local camera = workspace.CurrentCamera
+            local lookVector = camera.CFrame.LookVector
+            local flatLook = Vector3.new(lookVector.X, 0, lookVector.Z)
+            
+            if flatLook.Magnitude > 0.001 then
+                flatLook = flatLook.Unit
+                root.CFrame = CFrame.lookAt(root.Position, root.Position + flatLook)
+            end
+        end
+    end)
+end
+
+local function disableShiftLockSystem()
+    local character, humanoid, root = getCharacterForShiftLock()
+    
+    shiftLockActive = false
+    if shiftLockBtn then
+        shiftLockBtn.Image = "rbxassetid://105987953182009"
+    end
+    
+    workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    
+    humanoid.AutoRotate = true
+    
+    if shiftLockConnection then
+        shiftLockConnection:Disconnect()
+        shiftLockConnection = nil
+    end
+end
+
+local isShiftLock = createOption("Enable Shift Lock", false, "Config", function(active)
+    if active then
+        shiftLockSystemEnabled = true
+        
+        if not shiftLockGui then
+            shiftLockGui = Instance.new("ScreenGui")
+            shiftLockGui.Name = "ShiftLockGUI"
+            shiftLockGui.ResetOnSpawn = false
+            shiftLockGui.Parent = PlayerGui
+            
+            shiftLockBtn = Instance.new("ImageButton")
+            shiftLockBtn.Size = UDim2.new(0, 50, 0, 50)
+            shiftLockBtn.Position = UDim2.new(0.5, -25, 0.76, 0)
+            shiftLockBtn.BackgroundTransparency = 1
+            shiftLockBtn.Image = "rbxassetid://139211296111194"
+            shiftLockBtn.Parent = shiftLockGui
+            
+            shiftLockBtn.Activated:Connect(function()
+                if shiftLockActive then
+                    disableShiftLockSystem()
+                else
+                    enableShiftLockSystem()
+                end
+            end)
+        end
+        
+        enableShiftLockSystem()
+    else
+        shiftLockSystemEnabled = false
+        
+        if shiftLockConnection then
+            shiftLockConnection:Disconnect()
+            shiftLockConnection = nil
+        end
+        
+        if shiftLockGui then
+            shiftLockGui:Destroy()
+            shiftLockGui = nil
+            shiftLockBtn = nil
+        end
+        
+        local character = Player.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.AutoRotate = true
+            end
+        end
+        
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        shiftLockActive = false
+    end
+end)
+
+Player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if shiftLockActive and shiftLockSystemEnabled then
+        enableShiftLockSystem()
+    end
+end)
+
 createInfoBox("By: Cleiton10HDx", "Script created by this user.", "Credits", false)
 createInfoBox("Discord", "My Discord server.", "Credits", true, "https://discord.gg/72P6NhC5Pf")
 
