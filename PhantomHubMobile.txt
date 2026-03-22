@@ -84,7 +84,8 @@ local inputDebounce = {}
 local function createDebounce(key, duration)
     if inputDebounce[key] then return false end
     inputDebounce[key] = true
-    local adjustedDuration = duration or 0.05
+    local inputType = UserInputService:GetLastInputType()
+    local adjustedDuration = duration or (inputType == Enum.UserInputType.Mouse or inputType == Enum.UserInputType.MouseButton1 or inputType == Enum.UserInputType.MouseButton2) and 0.05 or 0.03
     task.delay(adjustedDuration, function() inputDebounce[key] = nil end)
     return true
 end
@@ -254,6 +255,7 @@ local function connectButtonInput(button, callback)
     end
 
     button.Activated:Connect(execute)
+    button.MouseButton1Click:Connect(execute)
 end
 
 local function createOption(name, startActive, tab, callback)
@@ -301,19 +303,19 @@ local function createOption(name, startActive, tab, callback)
     Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
 
     local function toggleSwitch()
-        if createDebounce(name, 0.05) then
-            optionStates[name] = not optionStates[name]
-            setOptionState(name, optionStates[name])
+    if createDebounce(name, 0.05) then
+        optionStates[name] = not optionStates[name]
+        setOptionState(name, optionStates[name])
 
-            Circle:TweenPosition(optionStates[name] and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9), "Out", "Quad", 0.2, true)
-            SwitchBG.BackgroundColor3 = optionStates[name] and Color3.fromRGB(150, 150, 150) or Color3.fromRGB(40, 40, 40)
+        Circle:TweenPosition(optionStates[name] and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9), "Out", "Quad", 0.2, true)
+        SwitchBG.BackgroundColor3 = optionStates[name] and Color3.fromRGB(150, 150, 150) or Color3.fromRGB(40, 40, 40)
 
-            if callback then 
-                task.wait(0.05)
-                task.spawn(function() callback(optionStates[name]) end)
-            end
+        if callback then 
+            task.wait(0.05)
+            task.spawn(function() callback(optionStates[name]) end)
         end
     end
+end
 
     SwitchBG.Activated:Connect(toggleSwitch)
 
@@ -394,25 +396,23 @@ local function createSlider(name, min, max, default, tab, callback)
     end
 
     SliderBG.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        updateSlider(input)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Mouse or input.UserInputType == Enum.UserInputType.Touch then
             updateSlider(input)
         end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging then
-            if input.UserInputType == Enum.UserInputType.Touch then
-                updateSlider(input)
-            end
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
 
     table.insert(options[tab], Container)
 end
@@ -458,7 +458,7 @@ local function createInfoBox(title, desc, tab, isButton, linkToCopy)
         ClickBtn.BackgroundTransparency = 1
         ClickBtn.Text = ""
         ClickBtn.Parent = Container
-        ClickBtn.Activated:Connect(function()
+        ClickBtn.MouseButton1Click:Connect(function()
             if type(setclipboard) == "function" then pcall(function() setclipboard(linkToCopy) end) end
         end)
     end
@@ -761,7 +761,7 @@ searchBar.FocusLost:Connect(function(enterPressed)
     end
 end)
 
-ConfirmBtn.Activated:Connect(function()
+ConfirmBtn.MouseButton1Click:Connect(function()
     minEarnValue = tempValue
     optionStates["MinEarnSell"] = minEarnValue
     setOptionState("MinEarnSell", minEarnValue)
@@ -770,7 +770,7 @@ ConfirmBtn.Activated:Connect(function()
     InnerFrame.Visible = true
 end)
 
-CancelBtn.Activated:Connect(function()
+CancelBtn.MouseButton1Click:Connect(function()
     searchBar.Text = minEarnValue > 0 and formatValue(minEarnValue) or ""
     ConfirmFrame.Visible = false
     InnerFrame.Visible = true
@@ -904,27 +904,8 @@ end)
 local isAutoBat = createOption("Auto Bat", false, "Config")
 local isInfiniteJump = createOption("Infinite Jump", false, "Config")
 
--- ✅ CORREÇÃO DO LAG E BUG DO INFINITE JUMP
--- Agora usa InputBegan/InputEnded ao invés de Heartbeat contínuo
-local infiniteJumpPressed = false
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.Space then
-        if isInfiniteJump() then
-            infiniteJumpPressed = true
-        end
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Space then
-        infiniteJumpPressed = false
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    if infiniteJumpPressed and isInfiniteJump() then
+UserInputService.JumpRequest:Connect(function()
+    if isInfiniteJump() then
         local character = Player.Character
         if character then
             local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -1041,6 +1022,7 @@ local function enableShiftLockSystem()
     end
     
     workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     
     humanoid.AutoRotate = false
     
@@ -1069,6 +1051,7 @@ local function disableShiftLockSystem()
     end
     
     workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     
     humanoid.AutoRotate = true
     
@@ -1127,6 +1110,7 @@ local isShiftLock = createOption("Enable Shift Lock", false, "Config", function(
             end
         end
         
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
         shiftLockActive = false
     end
 end)
@@ -1591,7 +1575,7 @@ TabCredits.Activated:Connect(function() showTab("Credits") end)
 
 local draggingBtn, dragStartBtn, startPosBtn
 FloatingButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         draggingBtn = true
         dragStartBtn = input.Position
         startPosBtn = FloatingButton.Position
@@ -1600,7 +1584,7 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
     if draggingBtn and dragStartBtn then
-        if input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             local delta = input.Position - dragStartBtn
             FloatingButton.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y)
         end
@@ -1608,7 +1592,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         draggingBtn = false
     end
 end)
@@ -1972,21 +1956,12 @@ task.spawn(function()
     end
 end)
 
--- ✅ OTIMIZAÇÃO: Cache de ProximityPrompts para evitar GetDescendants() contínuo
-local proximityPromptCache = {}
-local lastProximityPromptUpdate = 0
-local proximityPromptUpdateInterval = 2
-
 task.spawn(function()
-    while task.wait(2) do
+    while task.wait(1.5) do
         if isInstantBrainrot() then
             pcall(function()
-                proximityPromptCache = {}
                 for _, obj in pairs(workspace:GetDescendants()) do
-                    if obj:IsA("ProximityPrompt") then
-                        proximityPromptCache[obj] = true
-                        obj.HoldDuration = 0
-                    end
+                    if obj:IsA("ProximityPrompt") then obj.HoldDuration = 0 end
                 end
             end)
         end
@@ -1996,7 +1971,7 @@ end)
 task.spawn(function()
     local blackListNames = {["SellPrompt"] = true, ["GrabPrompt"] = true, ["PlacePrompt"] = true, ["AddPrompt"] = true, ["DeleteAllPrompt"] = true, ["DeletePrompt"] = true, ["StealPrompt"] = true, ["GiftPrompt"] = true, ["OpenPrompt"] = true}
 
-    while task.wait(0.5) do
+    while task.wait(0.1) do
         local buyAny = isAutoBuyBrainrot()
         if buyAny or targetHead then
             pcall(function()
