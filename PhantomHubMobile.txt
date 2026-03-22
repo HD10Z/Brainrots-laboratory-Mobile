@@ -81,7 +81,6 @@ local hitboxSizeVal = 15
 local hitboxesExpanded = false
 local inputDebounce = {}
 
--- ADAPTAÇÃO MOBILE: Debounce simplificado (sem diferença de PC/Mobile)
 local function createDebounce(key, duration)
     if inputDebounce[key] then return false end
     inputDebounce[key] = true
@@ -247,7 +246,6 @@ local function repositionElements(tab)
     MainContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 50)
 end
 
--- ADAPTAÇÃO MOBILE: Usar apenas Activated (compatível com touch)
 local function connectButtonInput(button, callback)
     local function execute()
         if createDebounce(button.Name or tostring(button), 0.05) then
@@ -395,7 +393,6 @@ local function createSlider(name, min, max, default, tab, callback)
         if callback then callback(value) end
     end
 
-    -- ADAPTAÇÃO MOBILE: Usar Touch ao invés de Mouse
     SliderBG.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
@@ -907,10 +904,27 @@ end)
 local isAutoBat = createOption("Auto Bat", false, "Config")
 local isInfiniteJump = createOption("Infinite Jump", false, "Config")
 
--- ADAPTAÇÃO MOBILE: Remover JumpRequest (função PC), usar apenas Touch se necessário
--- O pulo infinito será controlado apenas através da opção ativada
+-- ✅ CORREÇÃO DO LAG E BUG DO INFINITE JUMP
+-- Agora usa InputBegan/InputEnded ao invés de Heartbeat contínuo
+local infiniteJumpPressed = false
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Space then
+        if isInfiniteJump() then
+            infiniteJumpPressed = true
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space then
+        infiniteJumpPressed = false
+    end
+end)
+
 RunService.Heartbeat:Connect(function()
-    if isInfiniteJump() then
+    if infiniteJumpPressed and isInfiniteJump() then
         local character = Player.Character
         if character then
             local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -1575,7 +1589,6 @@ TabFarm.Activated:Connect(function() showTab("Farm") end)
 TabConfig.Activated:Connect(function() showTab("Config") end)
 TabCredits.Activated:Connect(function() showTab("Credits") end)
 
--- ADAPTAÇÃO MOBILE: Converter drag do botão para Touch ao invés de Mouse
 local draggingBtn, dragStartBtn, startPosBtn
 FloatingButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch then
@@ -1959,12 +1972,21 @@ task.spawn(function()
     end
 end)
 
+-- ✅ OTIMIZAÇÃO: Cache de ProximityPrompts para evitar GetDescendants() contínuo
+local proximityPromptCache = {}
+local lastProximityPromptUpdate = 0
+local proximityPromptUpdateInterval = 2
+
 task.spawn(function()
-    while task.wait(1.5) do
+    while task.wait(2) do
         if isInstantBrainrot() then
             pcall(function()
+                proximityPromptCache = {}
                 for _, obj in pairs(workspace:GetDescendants()) do
-                    if obj:IsA("ProximityPrompt") then obj.HoldDuration = 0 end
+                    if obj:IsA("ProximityPrompt") then
+                        proximityPromptCache[obj] = true
+                        obj.HoldDuration = 0
+                    end
                 end
             end)
         end
@@ -1974,7 +1996,7 @@ end)
 task.spawn(function()
     local blackListNames = {["SellPrompt"] = true, ["GrabPrompt"] = true, ["PlacePrompt"] = true, ["AddPrompt"] = true, ["DeleteAllPrompt"] = true, ["DeletePrompt"] = true, ["StealPrompt"] = true, ["GiftPrompt"] = true, ["OpenPrompt"] = true}
 
-    while task.wait(0.1) do
+    while task.wait(0.5) do
         local buyAny = isAutoBuyBrainrot()
         if buyAny or targetHead then
             pcall(function()
