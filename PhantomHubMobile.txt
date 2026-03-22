@@ -1,5 +1,6 @@
 local Player = game.Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
+local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
@@ -78,13 +79,14 @@ end
 
 local hitboxSizeVal = 15
 local hitboxesExpanded = false
-local touchDebounce = {}
+local inputDebounce = {}
 
+-- ADAPTAÇÃO MOBILE: Debounce simplificado (sem diferença de PC/Mobile)
 local function createDebounce(key, duration)
-    if touchDebounce[key] then return false end
-    touchDebounce[key] = true
-    local adjustedDuration = duration or 0.1
-    task.delay(adjustedDuration, function() touchDebounce[key] = nil end)
+    if inputDebounce[key] then return false end
+    inputDebounce[key] = true
+    local adjustedDuration = duration or 0.05
+    task.delay(adjustedDuration, function() inputDebounce[key] = nil end)
     return true
 end
 
@@ -245,15 +247,15 @@ local function repositionElements(tab)
     MainContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 50)
 end
 
-local function connectTouchButton(button, callback)
+-- ADAPTAÇÃO MOBILE: Usar apenas Activated (compatível com touch)
+local function connectButtonInput(button, callback)
     local function execute()
-        if createDebounce(button.Name or tostring(button), 0.1) then
+        if createDebounce(button.Name or tostring(button), 0.05) then
             callback()
         end
     end
 
     button.Activated:Connect(execute)
-    button.TouchTap:Connect(execute)
 end
 
 local function createOption(name, startActive, tab, callback)
@@ -301,7 +303,7 @@ local function createOption(name, startActive, tab, callback)
     Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
 
     local function toggleSwitch()
-        if createDebounce(name, 0.1) then
+        if createDebounce(name, 0.05) then
             optionStates[name] = not optionStates[name]
             setOptionState(name, optionStates[name])
 
@@ -393,19 +395,26 @@ local function createSlider(name, min, max, default, tab, callback)
         if callback then callback(value) end
     end
 
-    SliderBG.TouchBegan:Connect(function(touch)
-        dragging = true
-        updateSlider(touch)
-    end)
-
-    SliderBG.TouchMoved:Connect(function(touch)
-        if dragging then
-            updateSlider(touch)
+    -- ADAPTAÇÃO MOBILE: Usar Touch ao invés de Mouse
+    SliderBG.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            updateSlider(input)
         end
     end)
 
-    SliderBG.TouchEnded:Connect(function()
-        dragging = false
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging then
+            if input.UserInputType == Enum.UserInputType.Touch then
+                updateSlider(input)
+            end
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
     end)
 
     table.insert(options[tab], Container)
@@ -493,7 +502,7 @@ local function createActionButton(name, tab, callback)
     ClickBtn.AutoButtonColor = false
 
     local function execute()
-        if createDebounce(name, 0.1) then
+        if createDebounce(name, 0.05) then
             callback()
         end
     end
@@ -778,7 +787,7 @@ sellClickArea.Parent = SellContainer
 sellClickArea.AutoButtonColor = false
 sellClickArea.Name = "SellClickArea"
 
-connectTouchButton(sellClickArea, function()
+connectButtonInput(sellClickArea, function()
     SellListContainer.Visible = not SellListContainer.Visible
     repositionElements("Main")
 end)
@@ -845,7 +854,7 @@ for _, brName in ipairs(sellBrainrots) do
         end
 
         local function toggleMut()
-            if createDebounce("MutBtn_" .. brName .. "_" .. m, 0.1) then
+            if createDebounce("MutBtn_" .. brName .. "_" .. m, 0.05) then
                 sellTargets[brName].Muts[m] = not sellTargets[brName].Muts[m]
                 mBtn.BackgroundColor3 = sellTargets[brName].Muts[m] and Color3.fromRGB(150, 150, 150) or Color3.fromRGB(40, 40, 40)
                 savedSettings["SellTargets"] = sellTargets
@@ -857,7 +866,7 @@ for _, brName in ipairs(sellBrainrots) do
     end
 
     local function toggleMutsFrame()
-        if createDebounce("NameBtn_" .. brName, 0.1) then
+        if createDebounce("NameBtn_" .. brName, 0.05) then
             mutsFrame.Visible = not mutsFrame.Visible
             local addY = mutsFrame.Visible and 35 or -35
             ySellSize = ySellSize + addY
@@ -868,7 +877,7 @@ for _, brName in ipairs(sellBrainrots) do
     nameBtn.Activated:Connect(toggleMutsFrame)
 
     local function toggleCheckBtn()
-        if createDebounce("CheckBtn_" .. brName, 0.1) then
+        if createDebounce("CheckBtn_" .. brName, 0.05) then
             sellTargets[brName].Active = not sellTargets[brName].Active
             checkBtn.BackgroundColor3 = sellTargets[brName].Active and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(40, 40, 40)
             savedSettings["SellTargets"] = sellTargets
@@ -896,6 +905,26 @@ createActionButton("Auto Rejoin", "Config", function()
 end)
 
 local isAutoBat = createOption("Auto Bat", false, "Config")
+local isInfiniteJump = createOption("Infinite Jump", false, "Config")
+
+-- ADAPTAÇÃO MOBILE: Remover JumpRequest (função PC), usar apenas Touch se necessário
+-- O pulo infinito será controlado apenas através da opção ativada
+RunService.Heartbeat:Connect(function()
+    if isInfiniteJump() then
+        local character = Player.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+end)
+
+local isAntiAFK = createOption("Anti AFK", false, "Config")
+local isAntiCheat = createOption("Anti Cheat", false, "Config")
+local isStaffDetector = createOption("Staff Detector", false, "Config")
+local isHitboxEnabled = createOption("Hitbox Expander", false, "Config")
 
 createSlider("Hitbox Size", 1, 100, 15, "Config", function(val)
     hitboxSizeVal = val
@@ -998,7 +1027,6 @@ local function enableShiftLockSystem()
     end
     
     workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     
     humanoid.AutoRotate = false
     
@@ -1027,7 +1055,6 @@ local function disableShiftLockSystem()
     end
     
     workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     
     humanoid.AutoRotate = true
     
@@ -1086,7 +1113,6 @@ local isShiftLock = createOption("Enable Shift Lock", false, "Config", function(
             end
         end
         
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
         shiftLockActive = false
     end
 end)
@@ -1128,7 +1154,7 @@ local function getAutoSecretOptionContainer()
     return nil
 end
 
-connectTouchButton(autoSecretClickArea, function()
+connectButtonInput(autoSecretClickArea, function()
     autoSecretConfigVisible = not autoSecretConfigVisible
     if autoSecretConfigContainer then
         autoSecretConfigContainer.Visible = autoSecretConfigVisible
@@ -1175,7 +1201,7 @@ autoSecretConfigCheckBtn.AutoButtonColor = false
 Instance.new("UICorner", autoSecretConfigCheckBtn).CornerRadius = UDim.new(0, 3)
 
 local function toggleAutoSecretLuckyBlocks()
-    if createDebounce("AutoSecretLuckyBlockCheck", 0.1) then
+    if createDebounce("AutoSecretLuckyBlockCheck", 0.05) then
         optionStates["AutoSecretLuckyBlocks"] = not optionStates["AutoSecretLuckyBlocks"]
         setOptionState("AutoSecretLuckyBlocks", optionStates["AutoSecretLuckyBlocks"])
         autoSecretConfigCheckBtn.BackgroundColor3 = optionStates["AutoSecretLuckyBlocks"] and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(40, 40, 40)
@@ -1234,7 +1260,7 @@ RebirthCircle.Parent = RebirthSwitchBG
 Instance.new("UICorner", RebirthCircle).CornerRadius = UDim.new(1, 0)
 
 local function toggleRebirthSwitch()
-    if createDebounce("RebirthSwitchBG", 0.1) then
+    if createDebounce("RebirthSwitchBG", 0.05) then
         if currentRebirthSelect > 0 then
             isRebirthAutoActive = not isRebirthAutoActive
             RebirthCircle:TweenPosition(isRebirthAutoActive and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9), "Out", "Quad", 0.2, true)
@@ -1278,7 +1304,7 @@ for i = 1, 11 do
     dropBtn.Name = "DropBtn_" .. i
 
     local function selectRebirth()
-        if createDebounce("DropBtn_" .. i, 0.1) then
+        if createDebounce("DropBtn_" .. i, 0.05) then
             currentRebirthSelect = i
             RebirthLabelBtn.Text = "Rebirth Auto Brainrots [Click]: " .. i
             DropdownFrame.Visible = false
@@ -1290,7 +1316,7 @@ for i = 1, 11 do
 end
 
 local function toggleDropdownFrame()
-    if createDebounce("RebirthLabelBtn", 0.1) then
+    if createDebounce("RebirthLabelBtn", 0.05) then
         DropdownFrame.Visible = not DropdownFrame.Visible
         repositionElements("Farm")
     end
@@ -1341,7 +1367,7 @@ for _, m in ipairs({"Normal", "Gold", "Diamond", "Rainbow", "Lava"}) do
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
     local function toggleIdxMut()
-        if createDebounce("IdxMut_" .. m, 0.1) then
+        if createDebounce("IdxMut_" .. m, 0.05) then
             mutSelected[m] = not mutSelected[m]
             btn.BackgroundColor3 = mutSelected[m] and Color3.fromRGB(150, 150, 150) or Color3.fromRGB(40, 40, 40)
         end
@@ -1360,7 +1386,7 @@ indexClickArea.Parent = IdxContainer
 indexClickArea.AutoButtonColor = false
 indexClickArea.Name = "IndexClickArea"
 
-connectTouchButton(indexClickArea, function()
+connectButtonInput(indexClickArea, function()
     IndexMutContainer.Visible = not IndexMutContainer.Visible
     repositionElements("Farm")
 end)
@@ -1397,7 +1423,7 @@ specClickArea.Parent = SpecContainer
 specClickArea.AutoButtonColor = false
 specClickArea.Name = "SpecClickArea"
 
-connectTouchButton(specClickArea, function()
+connectButtonInput(specClickArea, function()
     SpecificListContainer.Visible = not SpecificListContainer.Visible
     repositionElements("Farm")
 end)
@@ -1492,7 +1518,7 @@ for _, brName in ipairs(allBrainrots) do
         end
 
         local function toggleSpecMut()
-            if createDebounce("SpecMutBtn_" .. brName .. "_" .. m, 0.1) then
+            if createDebounce("SpecMutBtn_" .. brName .. "_" .. m, 0.05) then
                 specificTargets[brName].Muts[m] = not specificTargets[brName].Muts[m]
                 mBtn.BackgroundColor3 = specificTargets[brName].Muts[m] and Color3.fromRGB(150, 150, 150) or Color3.fromRGB(40, 40, 40)
                 savedSettings["SpecificTargets"] = specificTargets
@@ -1504,7 +1530,7 @@ for _, brName in ipairs(allBrainrots) do
     end
 
     local function toggleSpecMutsFrame()
-        if createDebounce("SpecNameBtn_" .. brName, 0.1) then
+        if createDebounce("SpecNameBtn_" .. brName, 0.05) then
             mutsFrame.Visible = not mutsFrame.Visible
             local addY = mutsFrame.Visible and 35 or -35
             ySpecSize = ySpecSize + addY
@@ -1515,7 +1541,7 @@ for _, brName in ipairs(allBrainrots) do
     nameBtn.Activated:Connect(toggleSpecMutsFrame)
 
     local function toggleSpecCheckBtn()
-        if createDebounce("SpecCheckBtn_" .. brName, 0.1) then
+        if createDebounce("SpecCheckBtn_" .. brName, 0.05) then
             specificTargets[brName].Active = not specificTargets[brName].Active
             checkBtn.BackgroundColor3 = specificTargets[brName].Active and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(40, 40, 40)
             savedSettings["SpecificTargets"] = specificTargets
@@ -1549,22 +1575,29 @@ TabFarm.Activated:Connect(function() showTab("Farm") end)
 TabConfig.Activated:Connect(function() showTab("Config") end)
 TabCredits.Activated:Connect(function() showTab("Credits") end)
 
+-- ADAPTAÇÃO MOBILE: Converter drag do botão para Touch ao invés de Mouse
 local draggingBtn, dragStartBtn, startPosBtn
-FloatingButton.TouchBegan:Connect(function(touch)
-    draggingBtn = true
-    dragStartBtn = touch.Position
-    startPosBtn = FloatingButton.Position
-end)
-
-FloatingButton.TouchMoved:Connect(function(touch)
-    if draggingBtn and dragStartBtn then
-        local delta = touch.Position - dragStartBtn
-        FloatingButton.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y)
+FloatingButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        draggingBtn = true
+        dragStartBtn = input.Position
+        startPosBtn = FloatingButton.Position
     end
 end)
 
-FloatingButton.TouchEnded:Connect(function()
-    draggingBtn = false
+UserInputService.InputChanged:Connect(function(input)
+    if draggingBtn and dragStartBtn then
+        if input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStartBtn
+            FloatingButton.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y)
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        draggingBtn = false
+    end
 end)
 
 FloatingButton.Activated:Connect(function()
@@ -1585,11 +1618,6 @@ Player.Idled:Connect(function()
         end)
     end
 end)
-
-local isAntiAFK = createOption("Anti AFK", false, "Config")
-local isAntiCheat = createOption("Anti Cheat", false, "Config")
-local isStaffDetector = createOption("Staff Detector", false, "Config")
-local isHitboxEnabled = createOption("Hitbox Expander", false, "Config")
 
 local badRoles = {["Proprietário(a)"] = true, ["Administrador(a)"] = true, ["Dev Game"] = true}
 local staffIds = {[4358286401] = true, [4386104527] = true}
