@@ -81,7 +81,6 @@ local hitboxSizeVal = 15
 local hitboxesExpanded = false
 local inputDebounce = {}
 
--- ADAPTAÇÃO MOBILE: Debounce simplificado (sem diferença de PC/Mobile)
 local function createDebounce(key, duration)
     if inputDebounce[key] then return false end
     inputDebounce[key] = true
@@ -247,7 +246,6 @@ local function repositionElements(tab)
     MainContent.CanvasSize = UDim2.new(0, 0, 0, yPos + 50)
 end
 
--- ADAPTAÇÃO MOBILE: Usar apenas Activated (compatível com touch)
 local function connectButtonInput(button, callback)
     local function execute()
         if createDebounce(button.Name or tostring(button), 0.05) then
@@ -395,7 +393,6 @@ local function createSlider(name, min, max, default, tab, callback)
         if callback then callback(value) end
     end
 
-    -- ADAPTAÇÃO MOBILE: Usar Touch ao invés de Mouse
     SliderBG.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
@@ -907,10 +904,26 @@ end)
 local isAutoBat = createOption("Auto Bat", false, "Config")
 local isInfiniteJump = createOption("Infinite Jump", false, "Config")
 
--- ADAPTAÇÃO MOBILE: Remover JumpRequest (função PC), usar apenas Touch se necessário
--- O pulo infinito será controlado apenas através da opção ativada
+-- CORREÇÃO DO BUG: Infinite Jump agora depende de input real
+local infiniteJumpActive = false
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Space or input.UserInputType == Enum.UserInputType.Touch then
+        if isInfiniteJump() then
+            infiniteJumpActive = true
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space or input.UserInputType == Enum.UserInputType.Touch then
+        infiniteJumpActive = false
+    end
+end)
+
 RunService.Heartbeat:Connect(function()
-    if isInfiniteJump() then
+    if infiniteJumpActive and isInfiniteJump() then
         local character = Player.Character
         if character then
             local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -1018,6 +1031,10 @@ local function getCharacterForShiftLock()
     return character, humanoid, root
 end
 
+-- OTIMIZAÇÃO DO SHIFT LOCK: Reduzir chamadas desnecessárias
+local lastShiftLockUpdate = 0
+local shiftLockUpdateInterval = 0.016 -- ~60fps
+
 local function enableShiftLockSystem()
     local character, humanoid, root = getCharacterForShiftLock()
     
@@ -1034,13 +1051,18 @@ local function enableShiftLockSystem()
     
     shiftLockConnection = RunService.RenderStepped:Connect(function()
         if shiftLockActive and shiftLockSystemEnabled then
-            local camera = workspace.CurrentCamera
-            local lookVector = camera.CFrame.LookVector
-            local flatLook = Vector3.new(lookVector.X, 0, lookVector.Z)
-            
-            if flatLook.Magnitude > 0.001 then
-                flatLook = flatLook.Unit
-                root.CFrame = CFrame.lookAt(root.Position, root.Position + flatLook)
+            local currentTime = tick()
+            if currentTime - lastShiftLockUpdate >= shiftLockUpdateInterval then
+                lastShiftLockUpdate = currentTime
+                
+                local camera = workspace.CurrentCamera
+                local lookVector = camera.CFrame.LookVector
+                local flatLook = Vector3.new(lookVector.X, 0, lookVector.Z)
+                
+                if flatLook.Magnitude > 0.001 then
+                    flatLook = flatLook.Unit
+                    root.CFrame = CFrame.lookAt(root.Position, root.Position + flatLook)
+                end
             end
         end
     end)
@@ -1575,7 +1597,6 @@ TabFarm.Activated:Connect(function() showTab("Farm") end)
 TabConfig.Activated:Connect(function() showTab("Config") end)
 TabCredits.Activated:Connect(function() showTab("Credits") end)
 
--- ADAPTAÇÃO MOBILE: Converter drag do botão para Touch ao invés de Mouse
 local draggingBtn, dragStartBtn, startPosBtn
 FloatingButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch then
@@ -1655,13 +1676,26 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, ...)
 end)
 
+-- OTIMIZAÇÃO PRINCIPAL: Consolidar múltiplos Heartbeats em um só
+local lastSpeedUpdate = 0
+local lastFlyUpdate = 0
+local lastNoclipUpdate = 0
+
 RunService.Heartbeat:Connect(function()
-    local char = Player.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = isSpeedEnabled() and customSpeedVal or 32
+    local currentTime = tick()
+    
+    -- Speed (não precisa atualizar frequentemente)
+    if currentTime - lastSpeedUpdate >= 0.05 then
+        lastSpeedUpdate = currentTime
+        local char = Player.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = isSpeedEnabled() and customSpeedVal or 32
+        end
     end
 
+    -- Fly (atualiza frequentemente)
     if isFlyActive and bg and bv then
+        lastFlyUpdate = currentTime
         local cam = workspace.CurrentCamera
         local char = Player.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
@@ -1698,6 +1732,7 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
+    -- Noclip (atualiza frequentemente)
     if noclipEnabled then
         local char = Player.Character
         if char then
@@ -1710,6 +1745,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- OTIMIZAÇÃO: Farm loop agora usa cache local e verifica menos frequentemente
 local clientFolder = workspace:FindFirstChild("Client")
 local pathFolder = clientFolder and clientFolder:FindFirstChild("Path")
 local brainrotsFolder = pathFolder and pathFolder:FindFirstChild("Brainrots")
@@ -1729,6 +1765,8 @@ local targetHead = nil
 local allValidHeads = {}
 local currentTargetIndex = 1
 local isHidden = false
+local lastFarmCheck = 0
+local farmCheckInterval = 0.1 -- Verificar a cada 0.1s ao invés de cada frame
 
 local epicNames = {
     ["Brr Brr Patapim"] = true, ["Rhino Toasterino"] = true, ["Brr Bicus Dicus"] = true,
@@ -1805,6 +1843,10 @@ local function checkIndex(name, mutation)
 end
 
 RunService.Heartbeat:Connect(function()
+    local currentTime = tick()
+    if currentTime - lastFarmCheck < farmCheckInterval then return end
+    lastFarmCheck = currentTime
+    
     if not brainrotsFolder then return end
 
     local autoEpic = isAutoEpic()
@@ -1902,7 +1944,15 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- OTIMIZAÇÃO: Hitbox check não precisa ser todo heartbeat
+local lastHitboxUpdate = 0
+local hitboxUpdateInterval = 0.2
+
 RunService.Heartbeat:Connect(function()
+    local currentTime = tick()
+    if currentTime - lastHitboxUpdate < hitboxUpdateInterval then return end
+    lastHitboxUpdate = currentTime
+    
     if isHitboxEnabled() then
         hitboxesExpanded = true
         for _, p in pairs(game.Players:GetPlayers()) do
