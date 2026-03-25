@@ -1947,14 +1947,38 @@ task.spawn(function()
         task.wait(0.05)
         if isAutoCollect() and (tick() - lastCollect) >= 1 then
             pcall(function()
-                for i = 1, 50 do
-                    Bridge:FireServer("General", "Brainrots", "Collect", "Slot" .. i)
+                local myBaseName = nil
+                local serverBases = workspace:FindFirstChild("Server") and workspace.Server:FindFirstChild("Bases")
+                if serverBases then
+                    for _, baseModel in pairs(serverBases:GetChildren()) do
+                        local owner = baseModel:FindFirstChild("OwnerId")
+                        if owner and tostring(owner.Value) == tostring(Player.UserId) then
+                            myBaseName = baseModel.Name
+                            break
+                        end
+                    end
+                end
+
+                if myBaseName then
+                    local clientBases = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Bases")
+                    local myClientBase = clientBases and clientBases:FindFirstChild(myBaseName)
+                    local slotsFolder = myClientBase and myClientBase:FindFirstChild("Slots")
+
+                    if slotsFolder then
+                        for i = 1, 50 do
+                            local slot = slotsFolder:FindFirstChild("Slot" .. i)
+                            if slot then
+                                Bridge:FireServer("General", "Brainrots", "Collect", "Slot" .. i)
+                            end
+                        end
+                    end
                 end
             end)
             lastCollect = tick()
         end
     end
 end)
+
 
 task.spawn(function()
     while task.wait(1.5) do
