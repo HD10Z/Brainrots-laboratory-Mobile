@@ -1947,7 +1947,7 @@ task.spawn(function()
         task.wait(0.05)
         if isAutoCollect() and (tick() - lastCollect) >= 1 then
             pcall(function()
-                for i = 1, 21 do
+                for i = 1, 50 do
                     Bridge:FireServer("General", "Brainrots", "Collect", "Slot" .. i)
                 end
             end)
