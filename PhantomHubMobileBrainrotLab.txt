@@ -1940,6 +1940,7 @@ task.spawn(function()
     end
 end)
 
+
 task.spawn(function()
     local Bridge = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Bridge")
     local lastCollect = 0
@@ -1965,6 +1966,7 @@ task.spawn(function()
                                 local collectPart = slot:FindFirstChild("Collect")
                                 if collectPart then
                                     Bridge:FireServer("General", "Brainrots", "Collect", slot.Name)
+                                    task.wait(0.05)
                                 end
                             end
                         end
