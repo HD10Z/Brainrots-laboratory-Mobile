@@ -1943,18 +1943,15 @@ end)
 task.spawn(function()
     local Bridge = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Bridge")
     local lastCollect = 0
-
     while true do
         task.wait(0.05)
         if isAutoCollect() and (tick() - lastCollect) >= 1 then
             pcall(function()
-                -- Pegando o client base diretamente
-                local clientBases = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Bases")
-                if clientBases then
-                    for _, baseModel in pairs(clientBases:GetChildren()) do
+                local serverBases = workspace:FindFirstChild("Server") and workspace.Server:FindFirstChild("Bases")
+                if serverBases then
+                    for _, baseModel in pairs(serverBases:GetChildren()) do
                         local slotsFolder = baseModel:FindFirstChild("Slots")
                         if slotsFolder then
-                            -- Ordena os slots por número
                             local sortedSlots = {}
                             for _, slot in pairs(slotsFolder:GetChildren()) do
                                 table.insert(sortedSlots, slot)
@@ -1964,7 +1961,6 @@ task.spawn(function()
                                 local bNum = tonumber(b.Name:match("%d+")) or 0
                                 return aNum < bNum
                             end)
-
                             for _, slot in ipairs(sortedSlots) do
                                 local collectPart = slot:FindFirstChild("Collect")
                                 if collectPart then
