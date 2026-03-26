@@ -1948,28 +1948,29 @@ task.spawn(function()
         task.wait(0.05)
         if isAutoCollect() and (tick() - lastCollect) >= 1 then
             pcall(function()
+                local allSlots = {}
                 local serverBases = workspace:FindFirstChild("Server") and workspace.Server:FindFirstChild("Bases")
                 if serverBases then
                     for _, baseModel in pairs(serverBases:GetChildren()) do
                         local slotsFolder = baseModel:FindFirstChild("Slots")
                         if slotsFolder then
-                            local sortedSlots = {}
                             for _, slot in pairs(slotsFolder:GetChildren()) do
-                                table.insert(sortedSlots, slot)
-                            end
-                            table.sort(sortedSlots, function(a, b)
-                                local aNum = tonumber(a.Name:match("%d+")) or 0
-                                local bNum = tonumber(b.Name:match("%d+")) or 0
-                                return aNum < bNum
-                            end)
-                            for _, slot in ipairs(sortedSlots) do
-                                local collectPart = slot:FindFirstChild("Collect")
-                                if collectPart then
-                                    Bridge:FireServer("General", "Brainrots", "Collect", slot.Name)
-                                    task.wait(0.05)
+                                if slot:FindFirstChild("Collect") then
+                                    table.insert(allSlots, slot)
                                 end
                             end
                         end
+                    end
+
+                    table.sort(allSlots, function(a, b)
+                        local aNum = tonumber(a.Name:match("%d+")) or 0
+                        local bNum = tonumber(b.Name:match("%d+")) or 0
+                        return aNum < bNum
+                    end)
+
+                    for _, slot in ipairs(allSlots) do
+                        Bridge:FireServer("General", "Brainrots", "Collect", slot.Name)
+                        task.wait(0.05)
                     end
                 end
             end)
