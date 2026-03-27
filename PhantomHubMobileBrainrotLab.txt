@@ -1942,36 +1942,26 @@ end)
 
 task.spawn(function()
     local Bridge = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Bridge")
-    local lastCollect = 0
-
     while true do
         task.wait(0.05)
-        if isAutoCollect() and (tick() - lastCollect) >= 1 then
+        if isAutoCollect() then
             pcall(function()
-                local allSlots = {}
                 local serverBases = workspace:FindFirstChild("Server") and workspace.Server:FindFirstChild("Bases")
-
                 if serverBases then
+                    local allSlots = {}
                     for _, baseModel in pairs(serverBases:GetChildren()) do
                         local slotsFolder = baseModel:FindFirstChild("Slots")
                         if slotsFolder then
                             for _, slot in pairs(slotsFolder:GetChildren()) do
                                 if slot:FindFirstChild("Collect") then
-                                    table.insert(allSlots, slot.Name)
+                                    allSlots[slot] = true
                                 end
                             end
                         end
                     end
-
-                    for _, slotName in ipairs(allSlots) do
-                        task.spawn(function()
-                            Bridge:FireServer("General", "Brainrots", "Collect", slotName)
-                        end)
-                    end
+                    Bridge:FireServer("General", "Brainrots", "CollectAll", allSlots)
                 end
             end)
-
-            lastCollect = tick()
         end
     end
 end)
