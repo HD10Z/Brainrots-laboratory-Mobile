@@ -1949,15 +1949,21 @@ task.spawn(function()
             pcall(function()
                 local serverBases = workspace:FindFirstChild("Server") and workspace.Server:FindFirstChild("Bases")
                 if serverBases then
+                    local slotsToCollect = {}
                     for _, baseModel in pairs(serverBases:GetChildren()) do
                         local slotsFolder = baseModel:FindFirstChild("Slots")
                         if slotsFolder then
                             for _, slot in pairs(slotsFolder:GetChildren()) do
                                 if slot:FindFirstChild("Collect") and slot.Collect:IsA("ClickDetector") then
-                                    Bridge:FireServer("General", "Brainrots", "Collect", slot.Name)
+                                    table.insert(slotsToCollect, slot.Name)
                                 end
                             end
                         end
+                    end
+                    if #slotsToCollect > 0 then
+                        task.spawn(function()
+                            Bridge:FireServer("General", "Brainrots", "CollectMultiple", slotsToCollect)
+                        end)
                     end
                 end
             end)
