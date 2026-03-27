@@ -1947,23 +1947,31 @@ task.spawn(function()
         task.wait(0.05)
         if isAutoCollect() and (tick() - lastCollect) >= 1 then
             pcall(function()
+                local myBaseName = nil
                 local serverBases = workspace:FindFirstChild("Server") and workspace.Server:FindFirstChild("Bases")
                 if serverBases then
-                    local slotsToCollect = {}
                     for _, baseModel in pairs(serverBases:GetChildren()) do
-                        local slotsFolder = baseModel:FindFirstChild("Slots")
-                        if slotsFolder then
-                            for _, slot in pairs(slotsFolder:GetChildren()) do
-                                if slot:FindFirstChild("Collect") and slot.Collect:IsA("ClickDetector") then
-                                    table.insert(slotsToCollect, slot.Name)
-                                end
-                            end
+                        local owner = baseModel:FindFirstChild("OwnerId")
+                        if owner and tostring(owner.Value) == tostring(Player.UserId) then
+                            myBaseName = baseModel.Name
+                            break
                         end
                     end
-                    if #slotsToCollect > 0 then
-                        task.spawn(function()
-                            Bridge:FireServer("General", "Brainrots", "CollectMultiple", slotsToCollect)
-                        end)
+                end
+
+                if myBaseName then
+                    local clientBases = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Bases")
+                    local myClientBase = clientBases and clientBases:FindFirstChild(myBaseName)
+                    local slotsFolder = myClientBase and myClientBase:FindFirstChild("Slots")
+
+                    if slotsFolder then
+                        for _, slot in pairs(slotsFolder:GetChildren()) do
+                            if slot:FindFirstChild("Collect") and slot.Collect:IsA("ClickDetector") then
+                                task.spawn(function()
+                                    Bridge:FireServer("General", "Brainrots", "Collect", slot.Name)
+                                end)
+                            end
+                        end
                     end
                 end
             end)
@@ -1971,6 +1979,7 @@ task.spawn(function()
         end
     end
 end)
+
 
 task.spawn(function()
     while task.wait(1.5) do
