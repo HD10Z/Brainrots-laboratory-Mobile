@@ -1942,12 +1942,25 @@ end)
 
 task.spawn(function()
     local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local Player = Players.LocalPlayer
 
+    local originalSound = nil
+
     while true do
-        task.wait(0.15)
+        task.wait(0.1)
+
         if isAutoCollect() then
             pcall(function()
+                local soundsFolder = ReplicatedStorage:FindFirstChild("Sounds")
+                if soundsFolder then
+                    local moneySound = soundsFolder:FindFirstChild("Money")
+                    if moneySound then
+                        originalSound = moneySound:Clone()
+                        moneySound:Destroy()
+                    end
+                end
+
                 local character = Player.Character
                 local root = character and character:FindFirstChild("HumanoidRootPart")
                 if not root then return end
@@ -1981,9 +1994,19 @@ task.spawn(function()
 
                         if collectPart and collectPart:IsA("BasePart") then
                             firetouchinterest(root, collectPart, 0)
+                            task.wait(0.03)
                             firetouchinterest(root, collectPart, 1)
+                            task.wait(0.03)
                         end
                     end
+                end
+            end)
+        else
+            pcall(function()
+                local soundsFolder = ReplicatedStorage:FindFirstChild("Sounds")
+                if soundsFolder and originalSound and not soundsFolder:FindFirstChild("Money") then
+                    originalSound.Parent = soundsFolder
+                    originalSound = nil
                 end
             end)
         end
