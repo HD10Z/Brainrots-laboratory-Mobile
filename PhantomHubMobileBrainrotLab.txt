@@ -1948,14 +1948,14 @@ task.spawn(function()
     local originalSound = nil
 
     while true do
-        task.wait(0.1)
+        task.wait(0.2)
 
         if isAutoCollect() then
             pcall(function()
                 local soundsFolder = ReplicatedStorage:FindFirstChild("Sounds")
                 if soundsFolder then
                     local moneySound = soundsFolder:FindFirstChild("Money")
-                    if moneySound then
+                    if moneySound and not originalSound then
                         originalSound = moneySound:Clone()
                         moneySound:Destroy()
                     end
@@ -1994,13 +1994,14 @@ task.spawn(function()
 
                         if collectPart and collectPart:IsA("BasePart") then
                             firetouchinterest(root, collectPart, 0)
-                            task.wait(0.03)
+                            task.wait(0.025)
                             firetouchinterest(root, collectPart, 1)
-                            task.wait(0.03)
                         end
                     end
                 end
             end)
+
+            task.wait(1.2)
         else
             pcall(function()
                 local soundsFolder = ReplicatedStorage:FindFirstChild("Sounds")
