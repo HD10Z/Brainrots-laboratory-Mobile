@@ -1941,14 +1941,17 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-    local Bridge = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Bridge")
     local Players = game:GetService("Players")
     local Player = Players.LocalPlayer
 
     while true do
-        task.wait(0.2)
+        task.wait(0.15)
         if isAutoCollect() then
             pcall(function()
+                local character = Player.Character
+                local root = character and character:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+
                 local myBaseName = nil
                 local serverBases = workspace:FindFirstChild("Server") and workspace.Server:FindFirstChild("Bases")
 
@@ -1974,8 +1977,11 @@ task.spawn(function()
                 if clientSlots and serverSlots then
                     for _, slot in ipairs(clientSlots:GetChildren()) do
                         local serverSlot = serverSlots:FindFirstChild(slot.Name)
-                        if serverSlot and serverSlot:FindFirstChild("Collect") then
-                            Bridge:FireServer("General", "Brainrots", "Collect", slot.Name)
+                        local collectPart = serverSlot and serverSlot:FindFirstChild("Collect")
+
+                        if collectPart and collectPart:IsA("BasePart") then
+                            root.CFrame = collectPart.CFrame + Vector3.new(0, 2, 0)
+                            task.wait(0.02)
                         end
                     end
                 end
