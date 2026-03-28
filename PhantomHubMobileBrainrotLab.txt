@@ -1948,9 +1948,10 @@ task.spawn(function()
     local currentIndex = 1
     local cachedSlots = {}
     local lastUpdate = 0
+    local lastFire = 0
 
     while true do
-        task.wait(0.05)
+        task.wait(0.03)
 
         if isAutoCollect() then
             pcall(function()
@@ -1970,7 +1971,8 @@ task.spawn(function()
                 if not myBaseName then return end
 
                 local now = tick()
-                if now - lastUpdate > 1 then
+
+                if now - lastUpdate > 0.5 then
                     cachedSlots = {}
 
                     local clientBases = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Bases")
@@ -1987,8 +1989,9 @@ task.spawn(function()
                     lastUpdate = now
                 end
 
-                if #cachedSlots > 0 then
+                if #cachedSlots > 0 and (now - lastFire) > 0.02 then
                     local slotName = cachedSlots[currentIndex]
+
                     if slotName then
                         Bridge:FireServer("General", "Brainrots", "Collect", slotName)
                     end
@@ -1997,6 +2000,8 @@ task.spawn(function()
                     if currentIndex > #cachedSlots then
                         currentIndex = 1
                     end
+
+                    lastFire = now
                 end
             end)
         else
