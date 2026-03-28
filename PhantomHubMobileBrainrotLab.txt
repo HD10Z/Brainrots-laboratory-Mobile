@@ -1980,8 +1980,8 @@ task.spawn(function()
                         local collectPart = serverSlot and serverSlot:FindFirstChild("Collect")
 
                         if collectPart and collectPart:IsA("BasePart") then
-                            root.CFrame = collectPart.CFrame + Vector3.new(0, 2, 0)
-                            task.wait(0.02)
+                            firetouchinterest(root, collectPart, 0)
+                            firetouchinterest(root, collectPart, 1)
                         end
                     end
                 end
