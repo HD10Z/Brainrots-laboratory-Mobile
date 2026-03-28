@@ -1941,30 +1941,19 @@ task.spawn(function()
 end)
 
 task.spawn(function()
+    local Bridge = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Bridge")
     local Players = game:GetService("Players")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local Player = Players.LocalPlayer
 
-    local originalSound = nil
+    local currentIndex = 1
+    local cachedSlots = {}
+    local lastUpdate = 0
 
     while true do
-        task.wait(0.15)
+        task.wait(0.05)
 
         if isAutoCollect() then
             pcall(function()
-                local soundsFolder = ReplicatedStorage:FindFirstChild("Sounds")
-                if soundsFolder then
-                    local moneySound = soundsFolder:FindFirstChild("Money")
-                    if moneySound and not originalSound then
-                        originalSound = moneySound:Clone()
-                        moneySound:Destroy()
-                    end
-                end
-
-                local character = Player.Character
-                local root = character and character:FindFirstChild("HumanoidRootPart")
-                if not root then return end
-
                 local myBaseName = nil
                 local serverBases = workspace:FindFirstChild("Server") and workspace.Server:FindFirstChild("Bases")
 
@@ -1980,36 +1969,39 @@ task.spawn(function()
 
                 if not myBaseName then return end
 
-                local clientBases = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Bases")
-                local myClientBase = clientBases and clientBases:FindFirstChild(myBaseName)
-                local clientSlots = myClientBase and myClientBase:FindFirstChild("Slots")
+                local now = tick()
+                if now - lastUpdate > 1 then
+                    cachedSlots = {}
 
-                local serverBase = serverBases and serverBases:FindFirstChild(myBaseName)
-                local serverSlots = serverBase and serverBase:FindFirstChild("Slots")
+                    local clientBases = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Bases")
+                    local myClientBase = clientBases and clientBases:FindFirstChild(myBaseName)
+                    local clientSlots = myClientBase and myClientBase:FindFirstChild("Slots")
 
-                if clientSlots and serverSlots then
-                    for _, slot in ipairs(clientSlots:GetChildren()) do
-                        local serverSlot = serverSlots:FindFirstChild(slot.Name)
-                        local collectPart = serverSlot and serverSlot:FindFirstChild("Collect")
-
-                        if collectPart and collectPart:IsA("BasePart") then
-                            firetouchinterest(root, collectPart, 0)
-                            firetouchinterest(root, collectPart, 1)
-                            task.wait(0.05)
+                    if clientSlots then
+                        for _, slot in ipairs(clientSlots:GetChildren()) do
+                            table.insert(cachedSlots, slot.Name)
                         end
+                    end
+
+                    currentIndex = 1
+                    lastUpdate = now
+                end
+
+                if #cachedSlots > 0 then
+                    local slotName = cachedSlots[currentIndex]
+                    if slotName then
+                        Bridge:FireServer("General", "Brainrots", "Collect", slotName)
+                    end
+
+                    currentIndex += 1
+                    if currentIndex > #cachedSlots then
+                        currentIndex = 1
                     end
                 end
             end)
-
-            task.wait(1.5)
         else
-            pcall(function()
-                local soundsFolder = ReplicatedStorage:FindFirstChild("Sounds")
-                if soundsFolder and originalSound and not soundsFolder:FindFirstChild("Money") then
-                    originalSound.Parent = soundsFolder
-                    originalSound = nil
-                end
-            end)
+            cachedSlots = {}
+            currentIndex = 1
         end
     end
 end)
